@@ -8,7 +8,8 @@
   "license": "MIT",
   "scripts": {
     "build": "cashc ./contracts/perpetual.cash --output ./art/perpetual.json",
-    "test": "node ./test.js"
+    "test": "yarn build && yarn test:run",
+    "test:run": "node ./test.js"
   },
   "dependencies": {
     "cashc": "0.13.0-next.1",

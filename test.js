@@ -19,7 +19,7 @@ const ensureSuccess = async (name, build) => {
     try {
         await transaction.send();
     } catch (error) {
-        console.log('FAILED: ' + name);
+        console.log('FAILED: ' + name, error);
         throw new Error("Test Failure: " + name);
     }
     console.log('PASSED: ' + name);
@@ -59,36 +59,84 @@ const service = generateWallet();
 
 const provider = new MockNetworkProvider({ updateUtxoSet: false });
 const contract = new Contract(perpetual, [user.pubKeyHex], { provider });
-const mockUtxo = randomUtxo({ 
+const perpetualUtxo = randomUtxo({ 
     satoshis: 10000000n,
 });
+const feesUtxo = randomUtxo({
+    satoshis: 123456n
+});
 
-provider.addUtxo(contract.address, mockUtxo);
+provider.addUtxo(contract.address, perpetualUtxo);
+provider.addUtxo(service.address, feesUtxo);
 
 await ensureSuccess("Release_WhenInvoked_UserGetsPayout", () => new TransactionBuilder({ provider })
-    .addInput(mockUtxo, contract.unlock.release())
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
     .addOutput({ to: user.address, amount: 200000n })
     .addOutput({ to: service.address, amount: 10000n })
     .addOutput({ to: contract.address, amount: 9790000n })
 );
 
+await ensureSuccess("Release_WhenInvoked_AnyoneCanService", () => new TransactionBuilder({ provider })
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+    .addOutput({ to: user.address, amount: 200000n })
+    .addOutput({ to: attacker.address, amount: 10000n })
+    .addOutput({ to: contract.address, amount: 9790000n })
+);
+
+await ensureSuccess("Release_WhenInvoked_CanPayForTransaction", () => new TransactionBuilder({ provider })
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+    .addOutput({ to: user.address, amount: 200000n })
+    .addOutput({ to: attacker.address, amount: 10000n })
+    .addOutput({ to: contract.address, amount: 9790000n })
+);
+
 await ensureFailure("Release_WhenInvoked_WithLessThanPayout", () => new TransactionBuilder({ provider })
-    .addInput(mockUtxo, contract.unlock.release())
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
     .addOutput({ to: user.address, amount: 199999n })
     .addOutput({ to: service.address, amount: 10000n })
     .addOutput({ to: contract.address, amount: 9790000n })
 );
 
 await ensureFailure("Release_WhenInvoked_WithMoreThanPayout", () => new TransactionBuilder({ provider })
-    .addInput(mockUtxo, contract.unlock.release())
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
     .addOutput({ to: user.address, amount: 200001n })
     .addOutput({ to: service.address, amount: 10000n })
     .addOutput({ to: contract.address, amount: 9790000n })
 );
 
+await ensureFailure("Release_WhenInvoked_LessReturnedThanExpected", () => new TransactionBuilder({ provider })
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+    .addOutput({ to: user.address, amount: 200000n })
+    .addOutput({ to: service.address, amount: 10000n })
+    .addOutput({ to: contract.address, amount: 9789999n })
+);
+
+await ensureFailure("Release_WhenInvoked_MoreReturnedThanExpected", () => new TransactionBuilder({ provider })
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+    .addOutput({ to: user.address, amount: 200000n })
+    .addOutput({ to: service.address, amount: 10000n })
+    .addOutput({ to: contract.address, amount: 9790001n })
+);
+
 await ensureFailure("Release_WhenInvoked_WithAttackerPayoutAddress", () => new TransactionBuilder({ provider })
-    .addInput(mockUtxo, contract.unlock.release())
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
     .addOutput({ to: attacker.address, amount: 200000n })
     .addOutput({ to: service.address, amount: 10000n })
     .addOutput({ to: contract.address, amount: 9790000n })
+);
+
+await ensureFailure("Release_WhenInvoked_WithAttackerReturnAddress", () => new TransactionBuilder({ provider })
+    .addInput(perpetualUtxo, contract.unlock.release())
+    .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+    .addOutput({ to: user.address, amount: 200000n })
+    .addOutput({ to: service.address, amount: 10000n })
+    .addOutput({ to: attacker.address, amount: 9790000n })
 );

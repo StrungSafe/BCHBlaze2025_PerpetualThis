@@ -3,11 +3,14 @@ pragma cashscript ~0.13.0;
 contract Perpetual(pubkey user) 
 {
     // input_0 -> perpetual contract UTXO
-    // input_1 -> transaction funding UTXO // do I need to define anything here?
+    // input_1 -> service funding UTXO
     // output_0 -> user payout UTXO
     // output_1 -> service payout UTXO
     // output_2 (?) -> return remaining perpetual contract UTXO
     function release() {
+        require(tx.inputs.length == 2);
+        require(tx.outputs.length == 3);
+
         bytes25 userBytecode = new LockingBytecodeP2PKH(hash160(user));
         require(tx.outputs[0].lockingBytecode == userBytecode);
         
@@ -19,8 +22,9 @@ contract Perpetual(pubkey user)
 
         // TODO: Handle EOL low amounts available
         // TODO: Handle minimum values
+        // TODO: Do we need to validate if the user and return UTXO are validated? Feels like no
         // servicer
-        require(tx.outputs[1].value == serviceFee);
+        // require(tx.outputs[1].value == (tx.inputs[1].value + serviceFee - 10000 sats)); // Change + service fee - transaction cost but this can be inferred and maybe we don't care?
 
         // TODO: Handle EOL
         require(tx.outputs[2].value == initValue - payout - serviceFee);
