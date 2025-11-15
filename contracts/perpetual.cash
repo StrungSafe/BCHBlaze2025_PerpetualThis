@@ -1,6 +1,8 @@
-pragma cashscript ~0.11.0;
+pragma cashscript ~0.12.0;
 
-contract Perpetual(pubkey pub) 
+contract Perpetual(pubkey user) 
 {
-    
+    function release(sig userSig) {
+        require(checkSig(userSig, user));
+    }
 }

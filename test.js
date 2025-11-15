@@ -5,9 +5,7 @@ import {
     binToHex,
 } from '@bitauth/libauth';
 
-import gameArtifact from '../artifacts/perpetual.artc'
-
-import 'cashscript/jest';
+import perpetual from './art/perpetual.json' assert { type: 'json' };
 
 const secp256k1 = await instantiateSecp256k1();
 
@@ -19,15 +17,16 @@ const generateWallet = () => {
     return { privateKey, pubKeyHex, signatureTemplate };
 };
 
-describe('', () => {
-    const provider = new MockNetworkProvider();
-    const { xWallet, oWallet } = { xWallet: generateWallet(), oWallet: generateWallet() };
-    const gameContract = new Contract(gameArtifact, [xWallet.pubKeyHex, oWallet.pubKeyHex], { provider });
-    const utxo = provider.addUtxo(gameContract.address, randomUtxo());
+const user = generateWallet();
 
-    it('', () => {
-        const transaction = new TransactionBuilder({ provider })
-            .addInput(utxo, gameContract.play(xWallet.signatureTemplate));
-        expect(transaction).not.toFailRequire();
-    });
-});
+const provider = new MockNetworkProvider();
+const contract = new Contract(perpetual, [user.pubKeyHex], { provider, addressType: 'p2sh20' });
+const mockUtxo = randomUtxo();
+
+provider.addUtxo(contract.address, mockUtxo);
+
+const transaction = new TransactionBuilder({ provider })
+    .addInput(mockUtxo, contract.unlock.release(user.signatureTemplate))
+    .addOutput({ to: contract.address, amount: 10000n });
+
+transaction.send();

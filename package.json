@@ -1,14 +1,17 @@
 {
   "name": "perpetualThis",
+  "type": "module",
   "version": "0.1.0",
   "description": "A perpetual contract on BCH",
   "main": "index.js",
   "author": "StrungSafe",
   "license": "MIT",
   "scripts": {
+    "build": "node ./contracts/build.js",
     "test": "node ./test.js"
   },
   "dependencies": {
+    "cashc": "^0.12.0",
     "cashscript": "0.13.0-next.1"
   }
 }
