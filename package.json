@@ -4,5 +4,11 @@
   "description": "A perpetual contract on BCH",
   "main": "index.js",
   "author": "StrungSafe",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test": "node ./test.js"
+  },
+  "dependencies": {
+    "cashscript": "0.13.0-next.1"
+  }
 }
