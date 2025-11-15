@@ -65,9 +65,19 @@ const perpetualUtxo = randomUtxo({
 const feesUtxo = randomUtxo({
     satoshis: 123456n
 });
+const endUtxo = randomUtxo({
+    satoshis: 1n,
+});
 
 provider.addUtxo(contract.address, perpetualUtxo);
 provider.addUtxo(service.address, feesUtxo);
+provider.addUtxo(contract.address, endUtxo);
+
+
+
+// await ensureSuccess("Release_WhenInvoked_EndOfLife", () => new TransactionBuilder({ provider })
+//     .addInput(endUtxo, contract.unlock.release())
+// );
 
 await ensureSuccess("Release_WhenInvoked_UserGetsPayout", () => new TransactionBuilder({ provider })
     .addInput(perpetualUtxo, contract.unlock.release())
