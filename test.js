@@ -9,6 +9,24 @@ import perpetual from './art/perpetual.json' with { type: 'json' };
 
 const secp256k1 = await instantiateSecp256k1();
 
+const ensureSuccess = async build => {
+    const transaction = build();
+    await transaction.send();
+};
+
+const ensureFailure = async build => {
+    const transaction = build();
+    let fail = false;
+    try {
+        await transaction.send();
+    } catch(error) {
+        fail = true;
+    }
+    if(!fail) {
+        throw new Error("Test Failure");
+    }
+}
+
 const generateWallet = () => {
     const privateKey = generatePrivateKey();
     const pubKeyBin = secp256k1.derivePublicKeyCompressed(privateKey);
@@ -26,14 +44,12 @@ const mockUtxo = randomUtxo();
 
 provider.addUtxo(contract.address, mockUtxo);
 
-const transaction = new TransactionBuilder({ provider })
+ensureSuccess(() => new TransactionBuilder({ provider })
     .addInput(mockUtxo, contract.unlock.release(user.signatureTemplate))
-    .addOutput({ to: contract.address, amount: 10000n });
+    .addOutput({ to: contract.address, amount: 10000n })
+);
 
-transaction.send();
-
-const attack = new TransactionBuilder({ provider })
+ensureFailure(() => new TransactionBuilder({ provider })
     .addInput(mockUtxo, contract.unlock.release(attacker.signatureTemplate))
-    .addOutput({ to: contract.address, amount: 10000n });
-
-attack.send();
+    .addOutput({ to: contract.address, amount: 10000n })
+);
