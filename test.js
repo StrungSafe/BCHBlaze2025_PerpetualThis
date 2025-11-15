@@ -5,7 +5,7 @@ import {
     binToHex,
 } from '@bitauth/libauth';
 
-import perpetual from './art/perpetual.json' assert { type: 'json' };
+import perpetual from './art/perpetual.json' with { type: 'json' };
 
 const secp256k1 = await instantiateSecp256k1();
 
@@ -18,8 +18,9 @@ const generateWallet = () => {
 };
 
 const user = generateWallet();
+const attacker = generateWallet();
 
-const provider = new MockNetworkProvider();
+const provider = new MockNetworkProvider({ updateUtxoSet: false });
 const contract = new Contract(perpetual, [user.pubKeyHex], { provider, addressType: 'p2sh20' });
 const mockUtxo = randomUtxo();
 
@@ -30,3 +31,9 @@ const transaction = new TransactionBuilder({ provider })
     .addOutput({ to: contract.address, amount: 10000n });
 
 transaction.send();
+
+const attack = new TransactionBuilder({ provider })
+    .addInput(mockUtxo, contract.unlock.release(attacker.signatureTemplate))
+    .addOutput({ to: contract.address, amount: 10000n });
+
+attack.send();
