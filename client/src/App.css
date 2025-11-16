@@ -1,0 +1,47 @@
+.app {
+  background-color: #282c34;
+  color: white;
+  height: 100dvh;
+  width: 100dvw;
+
+  display: grid;
+  grid-auto-columns: 1fr; 
+  grid-template-columns: 1fr; 
+  grid-template-rows: 1fr 2fr 1fr; 
+  gap: 0px 0px; 
+  grid-template-areas: 
+    "header"
+    "content"
+    "footer"; 
+}
+
+.app-header {
+  grid-area: header;
+  display: grid;
+  justify-content: center;
+  font-size: calc(1rem + 2vmin);
+  margin-top: 2rem;
+}
+
+.app-main {
+  grid-area: content;
+  justify-items: center;
+  align-content: center;
+}
+
+.app-content {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  max-height: 33%;
+  min-height: 20rem;
+  width: 66%;
+  background-color: green;
+  border-radius: 1rem;
+}
+
+.app-footer {
+  grid-area: footer;
+  justify-items: center;
+  align-content: center;
+}
