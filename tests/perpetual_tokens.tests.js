@@ -50,7 +50,7 @@ const generateWallet = () => {
     const signatureTemplate = new SignatureTemplate(privateKey);
     const pubKeyHash = ripemd160.hash(sha256.hash(pubKeyBin));
     const encoded = encodeCashAddress({ prefix: network === 'mainnet' ? 'bitcoincash' : 'bchtest', type: 'p2pkhWithTokens', payload: pubKeyHash });
-    return { privateKey, pubKeyHex, signatureTemplate, address: typeof encoded === 'string' ? encoded : encoded.address };
+    return { privateKey, pubKeyHex, pubKeyHash, signatureTemplate, address: typeof encoded === 'string' ? encoded : encoded.address };
 };
 
 const user = generateWallet();
@@ -58,7 +58,7 @@ const service = generateWallet();
 const untrusted = generateWallet();
 
 const provider = new MockNetworkProvider({ updateUtxoSet: false });
-const contract = new Contract(perpetual, [user.pubKeyHex], { provider });
+const contract = new Contract(perpetual, [user.pubKeyHash], { provider });
 const perpetualUtxo = randomUtxo({
     amount: 1000n,
     token: randomToken({

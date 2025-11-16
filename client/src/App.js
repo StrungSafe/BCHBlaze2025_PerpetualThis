@@ -58,6 +58,13 @@ function App() {
 
       <main className="app-main">
         <div className="app-content">
+          <div>
+            <select name="network" defaultValue="mocknet">
+              <option value="mocknet">Mocknet</option>
+              <option value="chipnet">Chipnet</option>
+              <option value="mainnet">Mainnet</option>
+            </select>
+          </div>
           {
             !contract && (
               <form onSubmit={onSubmit}>
@@ -68,7 +75,7 @@ function App() {
                   <input id="address" type="text" />
                 </div>
                 <div>
-                  <input type="submit" value="onSubmit" />
+                  <input type="submit" value="Start" />
                 </div>
               </form>
             )
@@ -77,6 +84,13 @@ function App() {
             contract && (!contractUtxos || contractUtxos.length == 0) && (
               <div>
                 Send Tokens Here:<br /> { contract.tokenAddress }
+              </div>
+            )
+          }
+          {
+            contract && contractUtxos?.length > 0  && (
+              <div>
+                There {( contractUtxos.length > 1 ? 'are' : 'is')} {contractUtxos.length} perpetual contract{( contractUtxos.length > 1 ? 's' : '')} currently running
               </div>
             )
           }

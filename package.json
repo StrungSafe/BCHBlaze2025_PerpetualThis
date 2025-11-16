@@ -3,10 +3,10 @@
   "type": "module",
   "version": "0.1.0",
   "description": "A perpetual contract on BCH",
-  "main": "index.js",
   "author": "StrungSafe",
   "license": "MIT",
   "scripts": {
+    "start:service": "node ./index.js",
     "build": "yarn build:perpetual && yarn build:tokens",
     "build:perpetual": "cashc ./contracts/perpetual.cash --output ./art/perpetual.json",
     "build:tokens": "cashc ./contracts/perpetual_tokens.cash --output ./art/perpetual_tokens.json",
