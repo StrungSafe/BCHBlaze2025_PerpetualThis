@@ -1,6 +1,24 @@
 # BCHBlaze2025
 BCH Hackathon
 
-Node version v22.17.0
+## Dependencies
 
-https://unspent.cash/ -> Will focus on a cash tokens contract
+Node v22.17.0
+Yarn v1.22.22
+
+## How to Run
+
+1. After cloning this repo, open a command line and navigate to the clone directory
+1. Run `yarn build` 
+
+### Run Client
+
+1. `cd ./client`
+1. `yarn start`
+1. The client by default binds to http://localhost:3000
+
+### TODO
+
+1. Implement a timelock
+1. Implement Electrum Network
+1. UI Improvements

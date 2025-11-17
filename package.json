@@ -6,10 +6,11 @@
   "author": "StrungSafe",
   "license": "MIT",
   "scripts": {
-    "start:service": "node ./index.js",
-    "build": "yarn build:perpetual && yarn build:tokens",
+    "run:service": "node ./index.js",
+    "build": "yarn && yarn build:perpetual && yarn build:tokens && yarn build:client",
     "build:perpetual": "cashc ./contracts/perpetual.cash --output ./art/perpetual.json",
     "build:tokens": "cashc ./contracts/perpetual_tokens.cash --output ./art/perpetual_tokens.json",
+    "build:client": "cashc ./contracts/perpetual_tokens.cash --output ./client/src/perpetual_tokens.json",
     "test": "yarn build && yarn test:all",
     "test:all": "yarn test:perpetual && yarn test:tokens",
     "test:perpetual": "node ./tests/perpetual.tests.js",
