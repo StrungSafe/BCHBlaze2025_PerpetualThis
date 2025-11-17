@@ -1,41 +1,114 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Contract,
   MockNetworkProvider,
   randomUtxo,
+  randomToken,
+  SignatureTemplate,
+  TransactionBuilder,
 } from 'cashscript';
 import {
+    instantiateSecp256k1,
+    instantiateRipemd160,
+    instantiateSha256,
+    generatePrivateKey,
     binToHex,
     decodeCashAddress,
+    encodeCashAddress,
 } from '@bitauth/libauth';
 
 import perpetual from './perpetual_tokens.json' with { type: 'json' };
 
 import './App.css';
 
+const bigIntMax = (...args) => args.reduce((m, e) => e > m ? e : m);
+
+const secp256k1 = await instantiateSecp256k1();
+const ripemd160 = await instantiateRipemd160();
+const sha256 = await instantiateSha256();
+
+const generateWallet = (network) => {
+    const privateKey = generatePrivateKey();
+    const pubKeyBin = secp256k1.derivePublicKeyCompressed(privateKey);
+    const pubKeyHex = binToHex(pubKeyBin);
+    const signatureTemplate = new SignatureTemplate(privateKey);
+    const pubKeyHash = ripemd160.hash(sha256.hash(pubKeyBin));
+    const encoded = encodeCashAddress({ prefix: network === 'mainnet' ? 'bitcoincash' : 'bchtest', type: 'p2pkhWithTokens', payload: pubKeyHash });
+    return { privateKey, pubKeyHex, pubKeyHash, signatureTemplate, address: typeof encoded === 'string' ? encoded : encoded.address };
+};
 
 function App() {
+  const [user, setUser] = useState(null);
   const [contract, setContract] = useState(null);
   const [contractUtxos, setContractUtxos] = useState(null);
-  const onSubmit = e => {
+  const [network, setNetwork] = useState('mocknet');
+  const [provider] = useState(new MockNetworkProvider());
+  const [submitting, setSubmitting] = useState(false);
+  const onSubmit = useCallback(e => {
     e.preventDefault();
     const address = e.target.address.value;
     const pubKey = decodeCashAddress(address);
-    console.log('verify', address, pubKey);
     const pubKeyHex = binToHex(pubKey.payload);
-
-    // TODO: Change the network
-    const provider = new MockNetworkProvider();
     const contract = new Contract(perpetual, [pubKeyHex], { provider });
 
+    // mock network testing
+    provider.reset();
+    provider.addUtxo(contract.tokenAddress, randomUtxo({
+      token: randomToken(),
+    }));
+    setUser({ address });
+
     setContract(contract);
-  };
+  }, [provider]);
+  const onMockExecute = useCallback(async _ => {
+    setSubmitting(true);
+    const executor = generateWallet(network);
+    const feesUtxo = randomUtxo();
+    provider.addUtxo(executor.address, feesUtxo);
+
+    const perpetualUtxo = contractUtxos[0];
+    const service = executor;
+
+    const initial = perpetualUtxo.token.amount;
+    const payout = bigIntMax(1n, (initial / 100n) * 2n);
+    const fee = bigIntMax(1n, initial / 1000n);
+    const remainder = initial - payout - fee;
+    if(remainder > 0) {
+        await new TransactionBuilder({ provider })
+            .addInput(perpetualUtxo, contract.unlock.release())
+            .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+            .addOutput({ to: user.address, amount: 1000n, token: { amount: payout, category: perpetualUtxo.token.category } })
+            .addOutput({ to: contract.tokenAddress, amount: 1000n, token: { amount: remainder, category: perpetualUtxo.token.category } })
+            .addOutput({ to: service.address, amount: 1000n, token: { amount: fee, category: perpetualUtxo.token.category } })
+            .send();
+    } else {
+        if(initial - payout > 0) {
+            // potentially a partial fee payout
+            await new TransactionBuilder({ provider })
+                .addInput(perpetualUtxo, contract.unlock.release())
+                .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+                .addOutput({ to: user.address, amount: 1000n, token: { amount: payout, category: perpetualUtxo.token.category } })
+                .addOutput({ to: service.address, amount: 1000n, token: { amount: initial - payout, category: perpetualUtxo.token.category } })
+                .send();
+        } else { 
+            // lose out on cost to execute? or rework this to do a balloon payment?
+            await new TransactionBuilder({ provider })
+                .addInput(perpetualUtxo, contract.unlock.release())
+                .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+                .addOutput({ to: user.address, amount: 1000n, token: { amount: payout, category: perpetualUtxo.token.category } })
+                .addOutput({ to: service.address, amount: 1000n })
+                .send();
+        }
+    }
+
+    const updated = await provider.getUtxos(contract.tokenAddress);
+    setContractUtxos(updated);
+    setSubmitting(false);
+  }, [network, contractUtxos, contract, provider, user]);
   useEffect(() => {
     let disposed = false;
     const fetch = async () => {
-      if(contract) {
-        const provider = new MockNetworkProvider();
-        provider.addUtxo(contract.tokenAddress, randomUtxo())
+      if(contract) { // if provider changes but contract was loaded then this wouldn't reload...
         const utxos = await provider.getUtxos(contract.tokenAddress);
         if(!disposed) {
           setContractUtxos(utxos);
@@ -46,8 +119,8 @@ function App() {
     fetch();
     return () => {
       disposed = true;
-    }
-  }, [contract?.tokenAddress]);
+    };
+  }, [provider, contract]);
   return (
     <div className="app">
       <header className="app-header">
@@ -58,30 +131,33 @@ function App() {
 
       <main className="app-main">
         <div className="app-content">
-          <div>
-            <select name="network" defaultValue="mocknet">
-              <option value="mocknet">Mocknet</option>
-              <option value="chipnet">Chipnet</option>
-              <option value="mainnet">Mainnet</option>
-            </select>
-          </div>
+          
           {
             !contract && (
-              <form onSubmit={onSubmit}>
+              <>
                 <div>
-                  Enter BCH Address:
+                  <select name="network" value={network} onChange={(e) => setNetwork(e.target.value)}>
+                    <option value="mocknet">Mocknet</option>
+                    <option value="chipnet">TODO:Chipnet</option>
+                    <option value="mainnet">TODO:Mainnet</option>
+                  </select>
                 </div>
-                <div>
-                  <input id="address" type="text" />
-                </div>
-                <div>
-                  <input type="submit" value="Start" />
-                </div>
-              </form>
+                <form onSubmit={onSubmit}>
+                  <div>
+                    Enter BCH Address:
+                  </div>
+                  <div>
+                    <input id="address" type="text" />
+                  </div>
+                  <div>
+                    <input type="submit" value="Start" />
+                  </div>
+                </form>
+              </>
             )
           }
           {
-            contract && (!contractUtxos || contractUtxos.length == 0) && (
+            contract && (!contractUtxos || contractUtxos.length === 0) && (
               <div>
                 Send Tokens Here:<br /> { contract.tokenAddress }
               </div>
@@ -90,7 +166,26 @@ function App() {
           {
             contract && contractUtxos?.length > 0  && (
               <div>
-                There {( contractUtxos.length > 1 ? 'are' : 'is')} {contractUtxos.length} perpetual contract{( contractUtxos.length > 1 ? 's' : '')} currently running
+                <div>
+                  There {( contractUtxos.length > 1 ? 'are' : 'is')} {contractUtxos.length} perpetual contract{( contractUtxos.length > 1 ? 's' : '')} currently running
+
+                  {
+                    contractUtxos.map(utxo => (
+                      <div>
+                        sats: {utxo?.satoshis} <br />
+                        token: {utxo?.token.category} <br /> 
+                        amount: {utxo?.token.amount}
+                      </div>
+                    ))
+                  }
+                </div>
+                {
+                  network === 'mocknet' && (
+                    <div>
+                      <input type="button" value="Execute" onClick={onMockExecute} disabled={submitting} />
+                    </div>
+                  )
+                }
               </div>
             )
           }
