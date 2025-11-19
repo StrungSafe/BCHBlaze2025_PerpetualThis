@@ -20,11 +20,12 @@ Yarn v1.22.22
 ### TODO
 
 1. Implement a timelock
-1. Implement Electrum Network
-1. UI Improvements
+1. Implement additional network providers
+1. API and background service to complete the executor SAAS
+1. Design Improvements
 
 ### Potential Enhancements
 
 1. Adjustable payout rate
-1. Adjustable fee rate
-1. BCH Pay For Execution, Instead of CashTokens
+1. Adjustable fee rate or fixed
+1. Use BCH to pay executor instead of cashtokens
