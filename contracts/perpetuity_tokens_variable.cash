@@ -3,7 +3,7 @@ pragma cashscript ~0.13.0;
 // could couple the perpetuity UTXO w/ a return pkh
 // with the intent to have a no constructor contract design
 // contract lookup would be more robust and could simplify implementation
-contract Perpetuity(bytes20 pubKeyHash) 
+contract Perpetuity(bytes20 pubKeyHash, int payoutPercent) 
 {
     function break(pubkey owner, sig ownerSignature) {
         require(checkSig(ownerSignature, owner));
@@ -18,7 +18,7 @@ contract Perpetuity(bytes20 pubKeyHash)
         require(tx.outputs[this.activeInputIndex].lockingBytecode == userBytecode);
         
         int initValue = tx.inputs[this.activeInputIndex].tokenAmount;
-        int payout = max(1, (initValue / 100) * 2);
+        int payout = max(1, (initValue / 100) * payoutPercent);
         int serviceFee = max(1, (initValue / 1000));
         int remainder = initValue - payout - serviceFee;
 
