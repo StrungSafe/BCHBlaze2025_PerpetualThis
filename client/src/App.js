@@ -6,6 +6,7 @@ import {
   randomToken,
   SignatureTemplate,
   TransactionBuilder,
+  ElectrumNetworkProvider,
 } from 'cashscript';
 import {
   instantiateSecp256k1,
@@ -42,7 +43,7 @@ function App() {
   const [contract, setContract] = useState(null);
   const [contractUtxos, setContractUtxos] = useState(null);
   const [network, setNetwork] = useState('mocknet');
-  const [provider] = useState(new MockNetworkProvider());
+  const [provider, setProvider] = useState(new MockNetworkProvider());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
   const onSubmit = useCallback(e => {
@@ -66,15 +67,20 @@ function App() {
 
     const contract = new Contract(perpetuity, [pubKeyHex], { provider });
 
-    // mock network testing
-    provider.reset();
+    setUser({ address });
+    setContract(contract);
+  }, [provider]);
+  const onRefresh = async () => {
+    const updated = await provider.getUtxos(contract.tokenAddress);
+    setContractUtxos(updated);
+  };
+  const onMock = async () => {
     provider.addUtxo(contract.tokenAddress, randomUtxo({
       token: randomToken(),
     }));
-    setUser({ address });
-
-    setContract(contract);
-  }, [provider]);
+    const updated = await provider.getUtxos(contract.tokenAddress);
+    setContractUtxos(updated);
+  };
   const onMockExecute = useCallback(async _ => {
     setSubmitting(true);
     const executor = generateWallet(network);
@@ -120,10 +126,58 @@ function App() {
     setContractUtxos(updated);
     setSubmitting(false);
   }, [network, contractUtxos, contract, provider, user]);
+  const onExecute = useCallback(async _ => {
+    setSubmitting(true);
+
+    // TODO: Load wallet, get service UTXO
+    const executor = generateWallet(network);
+    const feesUtxo = randomUtxo();
+    provider.addUtxo(executor.address, feesUtxo);
+    // everything else should work
+
+    const perpetuityUtxo = contractUtxos[0];
+    const service = executor;
+
+    const initial = perpetuityUtxo.token.amount;
+    const payout = bigIntMax(1n, (initial / 100n) * 2n);
+    const fee = bigIntMax(1n, initial / 1000n);
+    const remainder = initial - payout - fee;
+    if (remainder > 0) {
+      await new TransactionBuilder({ provider })
+        .addInput(perpetuityUtxo, contract.unlock.release())
+        .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+        .addOutput({ to: user.address, amount: 1000n, token: { amount: payout, category: perpetuityUtxo.token.category } })
+        .addOutput({ to: contract.tokenAddress, amount: 1000n, token: { amount: remainder, category: perpetuityUtxo.token.category } })
+        .addOutput({ to: service.address, amount: 1000n, token: { amount: fee, category: perpetuityUtxo.token.category } })
+        .send();
+    } else {
+      if (initial - payout > 0) {
+        // potentially a partial fee payout
+        await new TransactionBuilder({ provider })
+          .addInput(perpetuityUtxo, contract.unlock.release())
+          .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+          .addOutput({ to: user.address, amount: 1000n, token: { amount: payout, category: perpetuityUtxo.token.category } })
+          .addOutput({ to: service.address, amount: 1000n, token: { amount: initial - payout, category: perpetuityUtxo.token.category } })
+          .send();
+      } else {
+        // lose out on cost to execute? or rework this to do a balloon payment?
+        await new TransactionBuilder({ provider })
+          .addInput(perpetuityUtxo, contract.unlock.release())
+          .addInput(feesUtxo, service.signatureTemplate.unlockP2PKH())
+          .addOutput({ to: user.address, amount: 1000n, token: { amount: payout, category: perpetuityUtxo.token.category } })
+          .addOutput({ to: service.address, amount: 1000n })
+          .send();
+      }
+    }
+
+    const updated = await provider.getUtxos(contract.tokenAddress);
+    setContractUtxos(updated);
+    setSubmitting(false);
+  }, [network, contractUtxos, contract, provider, user]);
   useEffect(() => {
     let disposed = false;
     const fetch = async () => {
-      if (contract) { // if provider changes but contract was loaded then this wouldn't reload...
+      if (contract) {
         const utxos = await provider.getUtxos(contract.tokenAddress);
         if (!disposed) {
           setContractUtxos(utxos);
@@ -136,11 +190,23 @@ function App() {
       disposed = true;
     };
   }, [provider, contract]);
+  useEffect(() => {
+    if (network === 'mocknet') {
+      setProvider(new MockNetworkProvider())
+    } else if (network === 'chipnet' || network === 'mainnet') {
+      setProvider(new ElectrumNetworkProvider(network));
+    } else {
+      console.error('unexpected network value', network)
+    }
+  }, [network]);
+
+  const isMocknet = network === 'mocknet';
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>
-          PerpetuityThis
+          EternalCash
         </h1>
       </header>
 
@@ -152,8 +218,8 @@ function App() {
                 <div style={{ paddingBottom: '1rem' }}>
                   <select name="network" value={network} onChange={(e) => setNetwork(e.target.value)}>
                     <option value="mocknet">Mocknet</option>
-                    <option value="chipnet">TODO:Chipnet</option>
-                    <option value="mainnet">TODO:Mainnet</option>
+                    <option value="chipnet">Chipnet</option>
+                    <option value="mainnet">Mainnet</option>
                   </select>
                 </div>
                 <form onSubmit={onSubmit} style={{ display: 'grid', rowGap: '0.5rem' }}>
@@ -175,8 +241,23 @@ function App() {
           }
           {
             contract && (!contractUtxos || contractUtxos.length === 0) && (
-              <div>
-                Send Tokens Here:<br /> {contract.tokenAddress}
+              <div style={{ display: 'grid', rowGap: '1rem' }}>
+                <div>
+                  <label style={{ marginRight: '0.5rem' }}>Send Tokens:</label>
+                  {contract.tokenAddress}
+                </div>
+                <div>
+                  {
+                    isMocknet && (
+                      <input type='button' value='Refresh' onClick={onMock} />
+                    )
+                  }
+                  {
+                    !isMocknet && (
+                      <input type='button' value='Refresh' onClick={onRefresh} />
+                    )
+                  }
+                </div>
               </div>
             )
           }
@@ -189,20 +270,25 @@ function App() {
                   {
                     contractUtxos.map(utxo => (
                       <div>
-                        trxid: {utxo.txid} <br />
+                        txid: {utxo.txid} <br />
                         token: {utxo?.token.category} <br />
                         amount: {utxo?.token.amount}
                       </div>
                     ))
                   }
                 </div>
+                <div>
                 {
-                  network === 'mocknet' && (
-                    <div>
+                  isMocknet && (
                       <input type="button" value="Execute" onClick={onMockExecute} disabled={submitting} />
-                    </div>
                   )
                 }
+                {
+                  !isMocknet && (
+                      <input type="button" value="Execute" onClick={onExecute} disabled={submitting} />
+                  )
+                }
+                  </div>
               </div>
             )
           }
