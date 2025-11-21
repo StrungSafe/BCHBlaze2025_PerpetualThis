@@ -146,7 +146,6 @@ function App() {
     const perpetuityUtxo = contractUtxos[0];
     const executor = getWallet({ network, wallet: executorWallet });
     const executorUtxos = (await provider.getUtxos(executor.address)).filter(u => !u.token && u.satoshis > 5000);
-    debugger;
     
     if(executorUtxos.length === 0) {
       console.error('no usable UTXOs available');
