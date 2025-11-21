@@ -16,6 +16,7 @@ import {
   binToHex,
   decodeCashAddress,
   encodeCashAddress,
+  decodePrivateKeyWif,
 } from '@bitauth/libauth';
 
 import perpetuity from './perpetuity_tokens.json' with { type: 'json' };
@@ -39,7 +40,7 @@ const generateWallet = (network) => {
   return { privateKey, pubKeyHex, pubKeyHash, signatureTemplate, address: typeof encoded === 'string' ? encoded : encoded.address };
 };
 
-async function getWallet(network) {
+async function getWallet({ network, wallet }) {
   const secp256k1 = await instantiateSecp256k1();
   const ripemd160 = await instantiateRipemd160();
   const sha256 = await instantiateSha256();
@@ -147,7 +148,7 @@ function App() {
     setSubmitting(true);
 
     const perpetuityUtxo = contractUtxos[0];
-    const executor = getWallet(network);
+    const executor = getWallet({ network, wallet: executorWallet });
     const feesUtxo = (await provider.getUtxos(executor.address)).filter(u => !u.token);
     debugger;
 
