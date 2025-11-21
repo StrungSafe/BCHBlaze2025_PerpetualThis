@@ -5,6 +5,7 @@ pragma cashscript ~0.13.0;
 // contract lookup would be more robust and could simplify implementation
 contract Perpetuity(bytes20 pubKeyHash, int payoutPercent) 
 {
+    // the owner can break out of the perpetuity contract
     function break(pubkey owner, sig ownerSignature) {
         require(checkSig(ownerSignature, owner));
         require(hash160(owner) == pubKeyHash);

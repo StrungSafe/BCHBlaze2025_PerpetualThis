@@ -49,13 +49,21 @@ function App() {
     e.preventDefault();
     const address = e.target.address.value;
 
-    if(!address) {
+    if (!address) {
       setFormError('No address provided');
       return;
     };
 
-    const pubKey = decodeCashAddress(address);
-    const pubKeyHex = binToHex(pubKey.payload);
+    let pubKeyHex;
+    try {
+      const pubKey = decodeCashAddress(address);
+      pubKeyHex = binToHex(pubKey.payload);
+    } catch (error) {
+      setFormError('Error parsing address');
+      console.error('Error parsing address', error)
+      return;
+    }
+
     const contract = new Contract(perpetuity, [pubKeyHex], { provider });
 
     // mock network testing
